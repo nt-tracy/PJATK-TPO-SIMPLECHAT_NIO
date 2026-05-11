@@ -40,10 +40,9 @@ public class ChatClient {
     public void logout() {
         try {
             sendRequest("logout");
-            Thread.sleep(100);
+            Thread.sleep(50);
             running = false;
-            if (receiverThread != null) receiverThread.interrupt();
-            if (channel.isOpen()) channel.close();
+            if (channel != null) channel.close();
         } catch (Exception e) {
             chatView.append("*** ").append(e).append("\n");
         }
@@ -65,22 +64,20 @@ public class ChatClient {
     private void startReceiver() {
         receiverThread = new Thread(() -> {
             ByteBuffer buffer = ByteBuffer.allocate(2048);
-            while (running && !Thread.currentThread().isInterrupted()) {
-                try {
+            try {
+                while (running && channel.isOpen()) {
                     buffer.clear();
-                    int bytesRead = channel.read(buffer);
-                    if (bytesRead > 0) {
+                    int readBytes = channel.read(buffer);
+                    if (readBytes > 0) {
                         buffer.flip();
                         String response = StandardCharsets.UTF_8.decode(buffer).toString();
                         chatView.append(response);
-                    } else if (bytesRead == -1) break;
-                    Thread.sleep(10);
-                } catch (IOException e) {
-                    break;
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
+                    } else if (readBytes == -1) {
+                        break;
+                    }
                 }
+            } catch (IOException e) {
+                if (running) chatView.append("*** ").append(e).append("\n");
             }
         });
         receiverThread.setDaemon(true);

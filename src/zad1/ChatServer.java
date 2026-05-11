@@ -29,8 +29,9 @@ public class ChatServer {
         try {
             selector = Selector.open();
             serverChannel = ServerSocketChannel.open();
-            serverChannel.bind(new InetSocketAddress(host, port));
             serverChannel.configureBlocking(false);
+            serverChannel.socket().setReuseAddress(true);
+            serverChannel.bind(new InetSocketAddress(host, port));
             serverChannel.register(selector, SelectionKey.OP_ACCEPT);
         } catch (IOException e) {
             throw new RuntimeException("Nie można zainicjować serwera", e);
@@ -71,13 +72,20 @@ public class ChatServer {
 
     public void stopServer() {
         running = false;
-        try {
+        if (selector != null) {
             selector.wakeup();
-            serverThread.join();
-            serverChannel.close();
-            selector.close();
-        } catch (Exception e) {
-            System.err.println("Closing error");
+        }
+        if (serverThread != null) {
+            try {
+                serverThread.join();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        try {
+            if (serverChannel != null) serverChannel.close();
+            if (selector != null) selector.close();
+        } catch (IOException e) {
         }
         System.out.println("Server stopped");
     }
